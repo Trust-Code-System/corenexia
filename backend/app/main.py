@@ -31,6 +31,8 @@ from app.orchestrator.graph import build_orchestrator
 from app.orchestrator.runs import RunRegistry
 from app.orchestrator.skills import SkillStore
 from app.sandbox import build_sandbox
+from app.sandbox.egress import build_egress_policy
+from app.sandbox.egress_approval import EgressApprovalStore
 from app.telemetry.events import EventBus
 from app.telemetry.otel import setup_tracing
 
@@ -71,11 +73,15 @@ async def lifespan(app: FastAPI):
         logger.error("The server will start but /v1/orchestrate returns 503 until this is fixed.")
 
     app.state.skills = SkillStore(settings.skills_db) if settings.skills_enabled else None
+    # Dynamic-synthesis safety: a live egress allowlist + a human-approval gate (Initiative D).
+    app.state.egress_policy = build_egress_policy()
+    app.state.egress_approvals = EgressApprovalStore(app.state.egress_policy)
     app.state.orchestrator = build_orchestrator(
         provider=app.state.provider,
         sandbox=app.state.sandbox,
         bus=app.state.bus,
         skills=app.state.skills,
+        egress_approvals=app.state.egress_approvals,
     )
 
     # Share the compiled orchestrator with the MCP tool surface, and run the MCP session

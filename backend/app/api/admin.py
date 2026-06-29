@@ -71,3 +71,52 @@ async def set_spend_cap(key_id: str, body: SpendCapRequest, request: Request) ->
 async def revoke_key(key_id: str, request: Request) -> None:
     if not request.app.state.keys.revoke(key_id):
         raise HTTPException(status_code=404, detail=f"No active key with id '{key_id}'.")
+
+
+# --- Egress approval gate (Initiative D) ---------------------------------
+
+
+class EgressRequestView(BaseModel):
+    id: str
+    host: str
+    reason: str
+    status: str
+    requested_at: float
+    decided_at: float | None = None
+
+
+def _approvals(request: Request):
+    store = getattr(request.app.state, "egress_approvals", None)
+    if store is None:
+        raise HTTPException(status_code=503, detail="Egress approval gate is not enabled.")
+    return store
+
+
+@admin_router.get("/egress/requests", response_model=list[EgressRequestView])
+async def list_egress_requests(request: Request, status: str | None = None):
+    """Review outbound-access requests filed by the agent (optionally filter by status)."""
+    return [EgressRequestView(**r.to_dict()) for r in _approvals(request).list(status)]
+
+
+@admin_router.get("/egress/allowlist")
+async def egress_allowlist(request: Request) -> dict:
+    """The current live egress allowlist (config hosts plus anything approved at runtime)."""
+    policy = getattr(request.app.state, "egress_policy", None)
+    return {"hosts": policy.hosts() if policy else []}
+
+
+@admin_router.post("/egress/requests/{request_id}/approve", response_model=EgressRequestView)
+async def approve_egress(request_id: str, request: Request):
+    """Approve a request → its host is added to the live allowlist the egress proxy enforces."""
+    req = _approvals(request).approve(request_id)
+    if req is None:
+        raise HTTPException(status_code=404, detail=f"No egress request '{request_id}'.")
+    return EgressRequestView(**req.to_dict())
+
+
+@admin_router.post("/egress/requests/{request_id}/deny", response_model=EgressRequestView)
+async def deny_egress(request_id: str, request: Request):
+    req = _approvals(request).deny(request_id)
+    if req is None:
+        raise HTTPException(status_code=404, detail=f"No egress request '{request_id}'.")
+    return EgressRequestView(**req.to_dict())

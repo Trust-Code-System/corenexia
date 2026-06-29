@@ -30,31 +30,57 @@ _CONNECT_TIMEOUT = 10
 
 
 class EgressPolicy:
-    """Allowlist of hostnames. Supports exact matches and `*.example.com` wildcards."""
+    """Allowlist of hostnames. Supports exact matches and `*.example.com` wildcards.
+
+    Mutable + thread-safe: the human-approval gate (Initiative D) adds hosts at runtime while the
+    proxy reads the policy from worker threads, so reads/writes are guarded by a lock.
+    """
 
     def __init__(self, allowlist: list[str] | None = None):
         self._exact: set[str] = set()
         self._suffixes: list[str] = []
+        self._lock = threading.Lock()
         for entry in allowlist or []:
-            entry = entry.strip().lower()
-            if not entry:
-                continue
-            if entry.startswith("*."):
-                self._suffixes.append(entry[1:])  # ".example.com"
-            else:
-                self._exact.add(entry)
+            self.add(entry)
 
     @property
     def is_empty(self) -> bool:
-        return not self._exact and not self._suffixes
+        with self._lock:
+            return not self._exact and not self._suffixes
+
+    def add(self, host: str) -> None:
+        """Allow a host (exact) or `*.suffix` wildcard. No-op for blank input."""
+        host = (host or "").strip().lower()
+        if not host:
+            return
+        with self._lock:
+            if host.startswith("*."):
+                suffix = host[1:]  # ".example.com"
+                if suffix not in self._suffixes:
+                    self._suffixes.append(suffix)
+            else:
+                self._exact.add(host)
+
+    def remove(self, host: str) -> None:
+        host = (host or "").strip().lower()
+        with self._lock:
+            self._exact.discard(host)
+            if host.startswith("*.") and host[1:] in self._suffixes:
+                self._suffixes.remove(host[1:])
+
+    def hosts(self) -> list[str]:
+        """The current allowlist (exact hosts + `*.suffix` wildcards), sorted."""
+        with self._lock:
+            return sorted(self._exact) + sorted(f"*{s}" for s in self._suffixes)
 
     def is_allowed(self, host: str) -> bool:
         if not host:
             return False
         host = host.strip().lower().rstrip(".")
-        if host in self._exact:
-            return True
-        return any(host.endswith(suffix) for suffix in self._suffixes)
+        with self._lock:
+            if host in self._exact:
+                return True
+            return any(host.endswith(suffix) for suffix in self._suffixes)
 
 
 def build_egress_policy() -> EgressPolicy:

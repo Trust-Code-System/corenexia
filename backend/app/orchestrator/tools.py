@@ -12,6 +12,7 @@ import json
 from app.llm.base import ToolSpec
 from app.orchestrator.skills import InvalidSkillName, SkillStore
 from app.sandbox.base import SandboxRunner
+from app.sandbox.egress_approval import EgressApprovalStore
 
 EXECUTE_PYTHON_CODE = ToolSpec(
     name="execute_python_code",
@@ -128,3 +129,38 @@ def run_skill_tool(tool_name: str, tool_input: dict, skills: SkillStore) -> tupl
         ), False
 
     return f"Unknown skill tool '{tool_name}'.", True
+
+
+# --- Dynamic integration synthesis: human-approval gate (Initiative D) ----
+
+REQUEST_EGRESS = ToolSpec(
+    name="request_egress",
+    description=(
+        "Request permission to make outbound network calls to a specific host (e.g. to use a "
+        "synthesized API client). The sandbox has NO network unless a host is approved by a human. "
+        "This does NOT grant access immediately — it files a request a person must approve. Use it "
+        "before writing code that needs the internet, then proceed only once the host is approved."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "host": {"type": "string", "description": "Hostname to reach, e.g. api.example.com."},
+            "reason": {"type": "string", "description": "Why this outbound call is needed."},
+        },
+        "required": ["host", "reason"],
+        "additionalProperties": False,
+    },
+)
+
+
+def run_egress_tool(tool_input: dict, approvals: EgressApprovalStore) -> tuple[str, bool]:
+    """Handle a request_egress call. Returns (tool_result_content, is_error)."""
+    try:
+        req = approvals.request(tool_input.get("host", ""), tool_input.get("reason", ""))
+    except ValueError as exc:
+        return f"Could not request egress: {exc}", True
+    if req.status == "approved":
+        return json.dumps({"host": req.host, "status": "allowed",
+                           "note": "Host already permitted; you may make the call."}), False
+    return json.dumps({"host": req.host, "status": "pending_approval", "request_id": req.id,
+                       "note": "A human must approve this host before any outbound call."}), False

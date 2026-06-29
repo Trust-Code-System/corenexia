@@ -23,12 +23,15 @@ from app.orchestrator.state import DEFAULT_SYSTEM_PROMPT, OrchestratorState
 from app.orchestrator.tools import (
     EXECUTE_PYTHON_CODE,
     LOAD_SKILL,
+    REQUEST_EGRESS,
     SAVE_SKILL,
     SKILL_TOOL_NAMES,
+    run_egress_tool,
     run_execute_python_code,
     run_skill_tool,
 )
 from app.sandbox.base import SandboxRunner
+from app.sandbox.egress_approval import EgressApprovalStore
 from app.telemetry import otel
 from app.telemetry.events import EventBus, OrchestratorEvent, Phase
 from app.telemetry.metering import UsageTotals
@@ -65,15 +68,21 @@ def build_orchestrator(
     bus: EventBus | None = None,
     sandbox_timeout: int | None = None,
     skills: SkillStore | None = None,
+    egress_approvals: EgressApprovalStore | None = None,
 ):
     """Compile a LangGraph app bound to the given provider/sandbox/bus.
 
-    When a `SkillStore` is provided, the agent also gets the save_skill/load_skill tools and a
-    catalog of saved skills in its system prompt (Initiative D). Omitting it keeps the classic
-    single-tool behavior.
+    Optional capabilities (Initiative D), each added only when injected:
+      * `skills` → save_skill/load_skill tools + a skill catalog in the system prompt,
+      * `egress_approvals` → the request_egress tool (human-approval gate for outbound hosts).
+    Omitting both keeps the classic single-tool behavior.
     """
     bus = bus or EventBus()
-    tools = [EXECUTE_PYTHON_CODE, SAVE_SKILL, LOAD_SKILL] if skills else [EXECUTE_PYTHON_CODE]
+    tools = [EXECUTE_PYTHON_CODE]
+    if skills:
+        tools += [SAVE_SKILL, LOAD_SKILL]
+    if egress_approvals:
+        tools += [REQUEST_EGRESS]
 
     def _emit(run_id: str, phase: Phase, message: str = "", **data) -> None:
         bus.publish(OrchestratorEvent(run_id=run_id, phase=phase, message=message, data=data))
@@ -86,6 +95,12 @@ def build_orchestrator(
         system = state["system"]
         if skills:
             system += _skill_system_suffix(skills)
+        if egress_approvals:
+            system += (
+                "\n\nNetwork access: the sandbox has NO internet by default. If a task needs an "
+                "outbound call, first use request_egress(host, reason); a human must approve the "
+                "host before you make the call. Never assume the network is available."
+            )
 
         request_model = getattr(provider, "_model", "") or ""
         with otel.llm_chat_span(request_model, system=provider.name) as llm_span:
@@ -141,6 +156,16 @@ def build_orchestrator(
                 )
                 _emit(run_id, Phase.THINKING, f"skill:{call.name}",
                       tool=call.name, is_error=is_error)
+                continue
+
+            # Egress approval gate — files a request; never opens the connection itself.
+            if egress_approvals and call.name == REQUEST_EGRESS.name:
+                content, is_error = run_egress_tool(call.input, egress_approvals)
+                tool_results.append(
+                    ToolResultBlock(tool_use_id=call.id, content=content, is_error=is_error)
+                )
+                _emit(run_id, Phase.THINKING, "request_egress",
+                      host=call.input.get("host", ""), is_error=is_error)
                 continue
 
             if call.name != EXECUTE_PYTHON_CODE.name:
