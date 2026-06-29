@@ -1,0 +1,32 @@
+{
+  "id": "finance",
+  "domain": "finance",
+  "title": "Finance",
+  "description": "General-finance analysis: equity metrics, growth math, and portfolio breakdowns. The orchestrator computes results in the sandbox (pandas/numpy available) and returns JSON. No cryptocurrency.",
+  "templates": [
+    {
+      "id": "finance-equity-metrics",
+      "title": "Equity valuation metrics",
+      "description": "Compute P/E, P/S, and dividend yield from raw figures.",
+      "query": "Given the figures in the context, compute the P/E ratio, price-to-sales ratio, and dividend yield. Run Python and print a JSON object with keys: pe, ps, dividend_yield_pct. Then state which metric stands out.",
+      "example_context": "Price $150.00 per share; trailing EPS $5.00; revenue per share $60.00; annual dividend per share $3.00.",
+      "tags": ["equities", "valuation", "ratios"]
+    },
+    {
+      "id": "finance-growth-cagr",
+      "title": "Growth & CAGR",
+      "description": "Compute compound annual growth rate over a period.",
+      "query": "From the revenue series in the context, compute the compound annual growth rate (CAGR) and the total growth percentage. Run Python and print a JSON object with keys: cagr_pct, total_growth_pct, years. Then report the CAGR as a percentage.",
+      "example_context": "Annual revenue ($M): 2023=100, 2024=140, 2025=180, 2026=200.",
+      "tags": ["growth", "cagr", "time-series"]
+    },
+    {
+      "id": "finance-portfolio-breakdown",
+      "title": "Portfolio allocation breakdown",
+      "description": "Compute asset-class weights and basic concentration from holdings.",
+      "query": "From the holdings in the context, compute each asset class's weight as a percentage of total and identify the largest allocation. Run Python and print a JSON object with keys: weights (object of class -> pct), total_value, largest_class. Then comment on diversification in one sentence.",
+      "example_context": "Holdings (USD): equities 300000, bonds 100000, real_estate 75000, cash 25000.",
+      "tags": ["portfolio", "allocation", "diversification"]
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "id": "general",
+  "domain": "general",
+  "title": "General starter",
+  "description": "Domain-neutral starters that show the core loop: the orchestrator writes Python, runs it in the sandbox, and returns structured results. Good first tasks for a new install.",
+  "templates": [
+    {
+      "id": "general-data-summary",
+      "title": "Summarize tabular data",
+      "description": "Parse rows of data and return summary statistics as JSON.",
+      "query": "Parse the CSV-style data in the context with pandas, then print a JSON object with the row count, column names, and the mean of every numeric column. Then summarize what the data shows in one sentence.",
+      "example_context": "name,age,salary\nAda,36,95000\nGrace,41,110000\nAlan,33,88000",
+      "tags": ["data", "pandas", "summary"]
+    },
+    {
+      "id": "general-text-extract",
+      "title": "Structured extraction from text",
+      "description": "Pull named entities / fields out of free text into JSON.",
+      "query": "From the text in the context, extract every email address, every dollar amount, and every date. Run Python (use the re module) and print a JSON object with keys: emails, amounts, dates. Then report how many of each you found.",
+      "example_context": "Invoice sent to billing@globex.com on 2026-04-15 for $1,250.00; reminder to ap@acme.io due 2026-05-01 for $980.50.",
+      "tags": ["regex", "extraction", "nlp"]
+    },
+    {
+      "id": "general-calculation",
+      "title": "Ad-hoc calculation",
+      "description": "Do a multi-step numeric computation and return the result.",
+      "query": "Compute the monthly payment on a loan using the figures in the context (standard amortization formula). Run Python and print a JSON object with keys: monthly_payment, total_paid, total_interest. Then state the monthly payment.",
+      "example_context": "Principal $250,000; annual interest rate 6.0%; term 30 years.",
+      "tags": ["math", "finance-math", "calculation"]
+    }
+  ]
+}

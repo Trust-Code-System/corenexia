@@ -1,0 +1,89 @@
+[
+  {
+    "id": "legal-governing-law",
+    "domain": "legal",
+    "query": "From the contract excerpt, identify the governing law. Run code that prints JSON {\"governing_law\": <state>} and then answer in one sentence.",
+    "context": "12. GOVERNING LAW. This Agreement shall be governed by and construed in accordance with the laws of the State of Delaware, without regard to its conflict-of-laws principles.",
+    "evaluators": [
+      {"type": "no_error"},
+      {"type": "step_json_field", "field": "governing_law", "equals": "Delaware"},
+      {"type": "answer_contains", "values": ["Delaware"], "ignore_case": true}
+    ],
+    "fixture": {
+      "code": "import json\ntext = 'laws of the State of Delaware'\nstate = text.split('State of ')[1].split(',')[0].strip()\nprint(json.dumps({'governing_law': state}))\n",
+      "answer": "The agreement is governed by the laws of the State of Delaware."
+    }
+  },
+  {
+    "id": "legal-nda-term-years",
+    "domain": "legal",
+    "query": "Determine the confidentiality term length in years from the NDA clause. Print JSON {\"term_years\": <int>} from code, then state it.",
+    "context": "5. TERM. The obligations of confidentiality under this Agreement shall survive for a period of three (3) years from the Effective Date.",
+    "evaluators": [
+      {"type": "no_error"},
+      {"type": "step_json_field", "field": "term_years", "equals": 3},
+      {"type": "answer_regex", "pattern": "three|3", "ignore_case": true}
+    ],
+    "fixture": {
+      "code": "import json, re\nclause = 'survive for a period of three (3) years'\nyears = int(re.search(r'\\((\\d+)\\)\\s*years', clause).group(1))\nprint(json.dumps({'term_years': years}))\n",
+      "answer": "The confidentiality obligations last three (3) years from the Effective Date."
+    }
+  },
+  {
+    "id": "legal-liability-cap",
+    "domain": "legal",
+    "query": "Does the clause contain a limitation-of-liability cap, and what is the cap amount? Print JSON {\"cap_usd\": <number>} and answer.",
+    "context": "9. LIMITATION OF LIABILITY. In no event shall either party's aggregate liability exceed the total fees paid, capped at fifty thousand dollars ($50,000).",
+    "evaluators": [
+      {"type": "no_error"},
+      {"type": "step_json_close", "field": "cap_usd", "expected": 50000, "tol": 0.5},
+      {"type": "answer_contains", "values": ["50,000"], "mode": "any"}
+    ],
+    "fixture": {
+      "code": "import json, re\nclause = 'capped at fifty thousand dollars ($50,000)'\ncap = float(re.search(r'\\$([\\d,]+)', clause).group(1).replace(',', ''))\nprint(json.dumps({'cap_usd': cap}))\n",
+      "answer": "Yes — liability is capped at fifty thousand dollars ($50,000)."
+    }
+  },
+  {
+    "id": "finance-cagr",
+    "domain": "finance",
+    "query": "Revenue grew from $100M to $200M over 3 years. Compute the CAGR. Print JSON {\"cagr\": <decimal>} from code, then report it as a percentage.",
+    "evaluators": [
+      {"type": "no_error"},
+      {"type": "step_json_close", "field": "cagr", "expected": 0.259921, "tol": 0.0005},
+      {"type": "answer_regex", "pattern": "25\\.9|26"}
+    ],
+    "fixture": {
+      "code": "import json\nbegin, end, years = 100.0, 200.0, 3\ncagr = (end / begin) ** (1 / years) - 1\nprint(json.dumps({'cagr': round(cagr, 6)}))\n",
+      "answer": "The compound annual growth rate is about 25.99% (~26%)."
+    }
+  },
+  {
+    "id": "finance-pe-ratio",
+    "domain": "finance",
+    "query": "A stock trades at $150 with trailing EPS of $5. Compute the P/E ratio. Print JSON {\"pe\": <number>} from code and answer.",
+    "evaluators": [
+      {"type": "no_error"},
+      {"type": "step_json_close", "field": "pe", "expected": 30, "tol": 0.01},
+      {"type": "answer_contains", "values": ["30"]}
+    ],
+    "fixture": {
+      "code": "import json\nprice, eps = 150.0, 5.0\nprint(json.dumps({'pe': price / eps}))\n",
+      "answer": "The price-to-earnings (P/E) ratio is 30."
+    }
+  },
+  {
+    "id": "finance-portfolio-weight",
+    "domain": "finance",
+    "query": "A portfolio holds $300k equities, $100k bonds, $100k cash. Compute the equities weight as a percentage. Print JSON {\"equities_weight_pct\": <number>} and answer.",
+    "evaluators": [
+      {"type": "no_error"},
+      {"type": "step_json_close", "field": "equities_weight_pct", "expected": 60, "tol": 0.01},
+      {"type": "answer_contains", "values": ["60"]}
+    ],
+    "fixture": {
+      "code": "import json\nholdings = {'equities': 300000, 'bonds': 100000, 'cash': 100000}\ntotal = sum(holdings.values())\nprint(json.dumps({'equities_weight_pct': round(100 * holdings['equities'] / total, 2)}))\n",
+      "answer": "Equities make up 60% of the portfolio."
+    }
+  }
+]

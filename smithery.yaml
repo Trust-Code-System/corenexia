@@ -1,0 +1,34 @@
+# Smithery registry manifest. Corenexia exposes its `orchestrate` tool over a streamable-HTTP MCP
+# server mounted at /mcp. Docs: https://smithery.ai/docs
+#
+# Staged for github.com/Trust-Code-System/corenexia. Publishing is a maintainer action — see
+# packaging/registry/RUNBOOK.md.
+
+startCommand:
+  type: http
+  endpoint: /mcp
+  configSchema:
+    type: object
+    properties:
+      apiKey:
+        type: string
+        title: API key
+        description: >-
+          Bearer API key (cnx_…) or scoped OAuth token when the deployment runs with
+          AUTH_ENABLED=true. Leave blank for an open local instance.
+    required: []
+
+metadata:
+  name: corenexia
+  displayName: Corenexia — Infinite Dynamic Orchestrator
+  description: >-
+    An AI agent that writes Python on the fly and runs it in a hardened, ephemeral sandbox, exposed
+    as a single `orchestrate` MCP tool. Flagship domains: legal and general finance.
+  homepage: https://github.com/Trust-Code-System/corenexia
+  license: Apache-2.0
+  tags:
+    - orchestrator
+    - code-execution
+    - sandbox
+    - legal
+    - finance

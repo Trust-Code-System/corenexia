@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt ruff
+      - name: Lint
+        run: ruff check backend
+      - name: Build sandbox image
+        run: docker build -t corenexia-sandbox -f docker/sandbox.Dockerfile .
+      - name: Tests
+        # test_sandbox.py runs against the freshly built image; the rest need no Docker.
+        run: pytest backend/tests -q
+        working-directory: ${{ github.workspace }}
+      - name: Eval gate (offline, deterministic — no LLM cost)
+        # Replays fixtures through the real sandbox and scores them; fails CI on regression.
+        run: python -m evals.run --offline --threshold 1.0
+        working-directory: backend
+
+  # Strongest-isolation job: run the sandbox/security suite under gVisor (runsc) on Linux.
+  gvisor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install gVisor (runsc) and register the Docker runtime
+        run: |
+          set -e
+          curl -fsSL https://gvisor.dev/archive.key | sudo gpg --dearmor -o /usr/share/keyrings/gvisor-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/gvisor-archive-keyring.gpg] https://storage.googleapis.com/gvisor/releases release main" | sudo tee /etc/apt/sources.list.d/gvisor.list > /dev/null
+          sudo apt-get update && sudo apt-get install -y runsc
+          sudo runsc install
+          sudo systemctl reload docker
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+      - name: Build sandbox image
+        run: docker build -t corenexia-sandbox -f docker/sandbox.Dockerfile .
+      - name: Security + sandbox suite under gVisor
+        working-directory: backend
+        env:
+          SANDBOX_RUNTIME: gvisor
+        run: pytest tests/test_security.py tests/test_sandbox.py -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npm run build

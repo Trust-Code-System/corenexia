@@ -1,0 +1,66 @@
+# Corenexia — one-command full stack: sandbox image + backend + God View frontend.
+#
+#   cp backend/.env.example backend/.env   # set ANTHROPIC_API_KEY (skip if you already have it)
+#   docker compose up --build              # → backend :8000  ·  God View :3000
+#
+# ─────────────────────────────────────────────────────────────────────────────
+#  ⚠  SECURITY: the backend creates ephemeral sandbox containers by shelling out to the Docker
+#  CLI, so this dev stack mounts the host Docker socket into the backend container. That grants
+#  the backend (and thus any code it runs) full control of the host Docker daemon — acceptable
+#  for LOCAL DEV ONLY. For anything shared or production, do NOT mount the socket: point the
+#  backend at a dedicated/remote or rootless daemon (DOCKER_HOST), or run the backend on the host
+#  while keeping only the sandbox containers isolated. See SECURITY.md.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  # Build-only: produces the `corenexia-sandbox` image in the daemon the backend will use, then
+  # exits. The backend waits for this to finish before accepting work.
+  sandbox-image:
+    build:
+      context: .
+      dockerfile: docker/sandbox.Dockerfile
+    image: corenexia-sandbox
+    command: ["python", "-c", "print('corenexia-sandbox image ready')"]
+    restart: "no"
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    image: corenexia-backend
+    # Reuses your existing backend env (Anthropic/Google keys, auth, OTel). One env file, not two.
+    env_file:
+      - backend/.env
+    environment:
+      # The sandbox image name the runner launches (matches the build above).
+      SANDBOX_IMAGE: corenexia-sandbox
+      # Let the God View (browser origin) reach this API.
+      ALLOWED_ORIGINS: http://localhost:3000
+    ports:
+      - "8000:8000"
+    volumes:
+      # DEV ONLY — see the security note at the top of this file.
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      sandbox-image:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status==200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+      args:
+        # Inlined into the client bundle at build time; must be the browser-facing API URL.
+        NEXT_PUBLIC_API_BASE: http://localhost:8000
+    image: corenexia-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy

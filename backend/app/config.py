@@ -1,0 +1,68 @@
+"""Central configuration. Single source of truth for provider selection and sandbox limits."""
+
+from __future__ import annotations
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    """Loaded from environment / `.env`. See `.env.example` for documentation."""
+
+    # LLM provider
+    llm_provider: str = "anthropic"
+    anthropic_api_key: str | None = None
+    anthropic_model: str = "claude-opus-4-8"
+    google_api_key: str | None = None
+    gemini_model: str = "gemini-2.5-pro"
+    llm_max_tokens: int = 8000
+    llm_timeout_seconds: float = 120.0
+    llm_max_retries: int = 2
+
+    # Sandbox (Docker)
+    sandbox_image: str = "corenexia-sandbox"
+    sandbox_memory: str = "512m"
+    sandbox_cpus: float = 1.0
+    sandbox_pids_limit: int = 128
+    sandbox_timeout_seconds: int = 30
+    sandbox_max_concurrency: int = 4  # max simultaneous sandbox containers
+    # Isolation backend: "docker" (hardened container, default; works on Windows/macOS/Linux),
+    # "gvisor" (Docker + runsc syscall-interception runtime; Linux deploy/CI), or "e2b" (microVM).
+    sandbox_runtime: str = "docker"
+    # seccomp profile for the Docker/gVisor runner: "default" (Docker's built-in filter),
+    # "unconfined" (disabled — not recommended), or an absolute path to a custom profile JSON.
+    sandbox_seccomp_profile: str = "default"
+
+    # Orchestrator
+    max_iterations: int = 6
+    runs_db: str = "corenexia_runs.db"  # persistent run/audit store
+
+    # Gateway (Milestone 4)
+    auth_enabled: bool = False  # when true, /v1/* requires a valid API key
+    admin_token: str | None = None  # guards /admin/keys
+    rate_limit_per_minute: int = 60  # per-key; 0 disables
+    api_keys_db: str = "corenexia_keys.db"
+
+    # Hardening (Milestone 5)
+    # Comma-separated browser origins allowed by CORS (the God View frontend).
+    allowed_origins: str = "http://localhost:3000"
+
+    # Observability (Initiative B) — OpenTelemetry GenAI tracing.
+    # When true, the app installs an SDK TracerProvider and emits spans. Configure the OTLP
+    # destination with the standard OTEL_EXPORTER_OTLP_ENDPOINT / *_HEADERS env vars (works with
+    # Langfuse, Phoenix, Jaeger, etc. — see OBSERVABILITY.md). Off by default.
+    otel_enabled: bool = False
+    otel_service_name: str = "corenexia"
+    otel_console_export: bool = False  # debug: print spans to stdout instead of OTLP
+
+    @property
+    def allowed_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+
+settings = Settings()

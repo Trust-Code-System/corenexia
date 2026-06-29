@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# API key store (SQLite)
+*.db
+
+# Node / frontend
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+frontend/.env*.local
+
+# Tooling / scratch
+.qodo/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

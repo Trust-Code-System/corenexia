@@ -1,0 +1,24 @@
+# Keep Docker build contexts small and free of secrets/artifacts.
+.git
+.github
+.venv
+**/__pycache__
+**/*.pyc
+.ruff_cache
+.qodo
+
+# Node / Next
+frontend/node_modules
+frontend/.next
+frontend/out
+
+# Local env + databases (never bake secrets or local state into images)
+.env
+backend/.env
+**/.env.local
+*.db
+backend/*.db
+
+# Docs / meta (not needed at runtime)
+*.md
+docs

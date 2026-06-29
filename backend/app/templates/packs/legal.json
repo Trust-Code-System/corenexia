@@ -1,0 +1,32 @@
+{
+  "id": "legal",
+  "domain": "legal",
+  "title": "Legal",
+  "description": "Contract analysis, NDA triage, and compliance checks. Each template embeds the document text in the query so the orchestrator can parse it in the sandbox and return structured JSON.",
+  "templates": [
+    {
+      "id": "legal-contract-extract",
+      "title": "Contract key-terms extraction",
+      "description": "Extract parties, effective date, term, governing law, and termination notice as structured JSON.",
+      "query": "Extract the parties, effective date, term length, governing law, and termination notice period from the contract in the context. Run Python to parse it and print a single JSON object with keys: parties, effective_date, term, governing_law, termination_notice. Then summarize in one paragraph.",
+      "example_context": "SERVICES AGREEMENT. This Agreement is entered into as of March 1, 2026 (the \"Effective Date\") by and between Acme Corp. (\"Provider\") and Globex Inc. (\"Customer\"). 1. TERM. This Agreement shall continue for an initial term of two (2) years. 9. TERMINATION. Either party may terminate upon thirty (30) days' written notice. 12. GOVERNING LAW. Governed by the laws of the State of Delaware.",
+      "tags": ["contract", "extraction", "structured-output"]
+    },
+    {
+      "id": "legal-nda-triage",
+      "title": "NDA triage (GREEN / YELLOW / RED)",
+      "description": "Screen an incoming NDA and classify its risk, flagging non-standard clauses.",
+      "query": "Review the NDA in the context. Identify the term length, whether it is mutual or one-way, the governing law, and any unusual or one-sided clauses (e.g. perpetual confidentiality, broad non-compete, assignment of IP). Print a JSON object with keys: classification (GREEN|YELLOW|RED), term_years, mutual (bool), governing_law, flags (list of strings). Then explain the classification briefly.",
+      "example_context": "MUTUAL NON-DISCLOSURE AGREEMENT. The obligations of confidentiality shall survive in perpetuity. This Agreement is governed by the laws of England and Wales. Each party assigns to the other all rights in any feedback provided.",
+      "tags": ["nda", "triage", "risk"]
+    },
+    {
+      "id": "legal-compliance-checklist",
+      "title": "Policy compliance checklist",
+      "description": "Check a document against a set of required clauses and report which are present or missing.",
+      "query": "Check whether the document in the context contains each of these required provisions: (1) data-protection / GDPR clause, (2) limitation of liability, (3) indemnification, (4) governing law, (5) confidentiality. Run Python to scan the text and print a JSON object mapping each provision to true/false plus a short evidence snippet. Then list what is missing.",
+      "example_context": "10. LIMITATION OF LIABILITY. In no event shall aggregate liability exceed fees paid. 11. CONFIDENTIALITY. Each party shall keep Confidential Information secret. 14. GOVERNING LAW. New York.",
+      "tags": ["compliance", "checklist", "audit"]
+    }
+  ]
+}

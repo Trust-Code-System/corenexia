@@ -1,0 +1,36 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.json",
+  "name": "io.github.Trust-Code-System/corenexia",
+  "description": "Infinite Dynamic Orchestrator: an AI agent that writes Python and runs it in a hardened sandbox, exposed as the `orchestrate` MCP tool. Legal & general-finance flagship.",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/Trust-Code-System/corenexia",
+    "source": "github"
+  },
+  "websiteUrl": "https://github.com/Trust-Code-System/corenexia",
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/trust-code-system/corenexia-backend",
+      "version": "0.1.0",
+      "transport": {
+        "type": "streamable-http",
+        "url": "http://localhost:8000/mcp"
+      },
+      "environmentVariables": [
+        {
+          "name": "ANTHROPIC_API_KEY",
+          "description": "Anthropic API key for the orchestrator's LLM provider.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "AUTH_ENABLED",
+          "description": "When true, /mcp requires a Bearer API key or scoped OAuth token.",
+          "isRequired": false,
+          "default": "false"
+        }
+      ]
+    }
+  ]
+}

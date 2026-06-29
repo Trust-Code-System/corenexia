@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-900 text-slate-100 antialiased;
+}
+
+/* React Flow theming to match the deep-navy / charcoal palette. */
+.react-flow__background {
+  background-color: #0f172a; /* slate-900 */
+}
+
+.react-flow__edge-path {
+  stroke: #334155; /* slate-700 */
+}
+
+/* A glowing, animated edge for live data transfer. */
+.edge-pulse .react-flow__edge-path {
+  stroke: #38bdf8;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.7));
+}
+
+.react-flow__attribution {
+  background: transparent;
+  color: #475569;
+}
