@@ -9,10 +9,34 @@ requires explicit go-ahead.**
 
 - [x] Local git repo initialized, secrets confirmed un-tracked (`.env`, `*.db` git-ignored)
 - [x] `server.json` (MCP Registry) + `smithery.yaml` finalized with owner `Trust-Code-System`
-- [ ] Public GitHub repo created + pushed  ← maintainer
-- [ ] Backend image pushed to GHCR  ← maintainer
-- [ ] Published to MCP Registry  ← maintainer (interactive GitHub auth)
-- [ ] Listed on Smithery  ← maintainer (web UI)
+- [x] **Public GitHub repo pushed + made public** → <https://github.com/Trust-Code-System/corenexia>
+- [ ] Backend image pushed to GHCR  ← needs a `write:packages` token (your `gh` token lacks it)
+- [ ] Published to MCP Registry  ← needs interactive `mcp-publisher login github`
+- [ ] Listed on Smithery  ← web UI
+
+## Remaining commands (run these yourself — they need interactive auth)
+
+```bash
+# 1. (optional) Push the backend image to GHCR so server.json's OCI package resolves.
+gh auth refresh -s write:packages                 # grant packages scope (browser)
+echo "$(gh auth token)" | docker login ghcr.io -u Lingz450 --password-stdin
+docker build -t ghcr.io/trust-code-system/corenexia-backend:0.1.0 -f docker/backend.Dockerfile .
+docker push ghcr.io/trust-code-system/corenexia-backend:0.1.0
+# then mark the package public in the org's GHCR package settings
+
+# 2. Publish to the MCP Registry (server.json is valid and at the repo root).
+#    Install the publisher from github.com/modelcontextprotocol/registry releases, then:
+mcp-publisher login github     # browser device-flow — authorize as a Trust-Code-System owner
+mcp-publisher validate         # validates ./server.json
+mcp-publisher publish          # publishes io.github.Trust-Code-System/corenexia
+
+# 3. Smithery: https://smithery.ai → Add server → connect Trust-Code-System/corenexia
+#    (it reads the root smithery.yaml), confirm the /mcp endpoint, publish.
+```
+
+> If `mcp-publisher` rejects the namespace casing, set `name` in `server.json` to the exact GitHub
+> login casing it reports. If you don't want to publish a GHCR image yet, you can publish the MCP
+> entry without the `packages` block (remove it) and add a hosted `remotes` URL later.
 
 ## Step 1 — Push the public repo (gh is authed as Lingz450)
 
