@@ -171,14 +171,17 @@ synthesis · DX+templates+registry · open-core vertical flagship.
 - [ ] Gated/outward-facing: publish to registries; demo GIF; full compose `up` end-to-end (live key)
 - Verified: 41 backend tests, ruff clean, frontend build green, eval gate 6/6.
 
-### Initiative D — Differentiator features  `[~] IN PROGRESS (mostly done)`
+### Initiative D — Differentiator features  `[x] COMPLETE & VERIFIED`
 - [x] Reusable skills + progressive tool disclosure: `save_skill`/`load_skill`, catalog in prompt,
   `SkillStore` + `/v1/skills` (`app/orchestrator/skills.py`, `app/api/skills.py`)
 - [x] Dynamic integration synthesis + human-approval gate: `request_egress` tool → admin approval
   adds the host to the live `EgressPolicy` the proxy enforces (`app/sandbox/egress_approval.py`)
 - [x] Gemini provider implemented against `google-genai` (translation unit-tested; live call gated)
-- [ ] True MCP aggregation (connect upstream MCP servers, re-expose)
-- [ ] Cost/latency-aware multi-LLM routing + streaming
+- [x] True MCP aggregation: `McpAggregator` connects upstream MCP servers, namespaces + re-exposes
+  their tools, proxies calls; `/v1/mcp/upstreams` (`app/orchestrator/mcp_aggregator.py`)
+- [x] Cost-aware multi-LLM routing with failover (`app/llm/router.py`); SSE run-streaming
+  (`POST /v1/orchestrate/stream`). Token-level LLM streaming remains a stretch item.
+- Verified: 83 backend tests, ruff clean, frontend build green.
 
 ### Initiative E (next)
 - **E — Cloud/enterprise (open-core monetization):** managed sandboxes, RBAC/SSO, audit, billing

@@ -41,6 +41,19 @@ it live, then fetch the result.
 { "run_id": "…", "status": "running", "telemetry_ws": "/ws/telemetry?run_id=…" }
 ```
 
+### `POST /v1/orchestrate/stream`
+Stream a run as **Server-Sent Events** — one frame per telemetry phase
+(`start`, `thinking`, `writing_code`, `executing_sandbox`, `done`/`error`), then a final `result`
+event with the answer. An HTTP alternative to the telemetry WebSocket.
+
+```
+event: writing_code
+data: {"run_id":"…","phase":"writing_code","message":"Generated code to run","data":{…}}
+
+event: result
+data: {"run_id":"…","status":"done","answer":"…","usage":{…}}
+```
+
 ### `GET /v1/runs/{run_id}`
 Fetch a background run's status and (once finished) its result. Never blocked by spend caps.
 
@@ -93,6 +106,8 @@ validated for signature, `iss`, `aud`, `exp`, and scope. Static API keys keep wo
 - `POST /mcp` — streamable-HTTP MCP server exposing the `orchestrate` tool. Point any MCP client
   (Claude Desktop, MCP Inspector) at `http://localhost:8000/mcp`. When `AUTH_ENABLED=true` it
   accepts a Bearer API key or a scoped token carrying `orchestrate:run`.
+- `GET /v1/mcp/upstreams` — when `MCP_UPSTREAMS` is configured, lists the upstream MCP servers
+  Corenexia aggregates and the namespaced tools (`<upstream>__<tool>`) it re-exposes to the agent.
 
 ## Health
 

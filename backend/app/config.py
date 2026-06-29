@@ -18,6 +18,17 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = 120.0
     llm_max_retries: int = 2
 
+    # Multi-LLM routing (Initiative D). When enabled, the orchestrator runs behind a router that
+    # picks among these providers and fails over on error. Strategy: "fallback" (in order) or
+    # "cost" (cheapest first). Each provider still needs its own key configured.
+    llm_routing_enabled: bool = False
+    llm_routing_providers: str = "anthropic,gemini"  # comma-separated, in priority order
+    llm_routing_strategy: str = "fallback"  # "fallback" | "cost"
+
+    @property
+    def llm_routing_provider_list(self) -> list[str]:
+        return [p.strip().lower() for p in self.llm_routing_providers.split(",") if p.strip()]
+
     # Sandbox (Docker)
     sandbox_image: str = "corenexia-sandbox"
     sandbox_memory: str = "512m"
@@ -51,6 +62,23 @@ class Settings(BaseSettings):
     # Reusable skills (Initiative D): the agent's persistent, self-built toolbox.
     skills_enabled: bool = True
     skills_db: str = "corenexia_skills.db"
+
+    # MCP aggregation (Initiative D): connect upstream MCP servers and re-expose their tools.
+    # JSON array of objects, e.g.
+    #   [{"name":"github","url":"https://host/mcp","auth_header":"Bearer X"}]
+    mcp_upstreams: str = ""
+
+    @property
+    def mcp_upstreams_list(self) -> list[dict]:
+        import json
+
+        if not self.mcp_upstreams.strip():
+            return []
+        try:
+            data = json.loads(self.mcp_upstreams)
+        except (ValueError, TypeError):
+            return []
+        return [d for d in data if isinstance(d, dict) and d.get("name") and d.get("url")]
 
     # Gateway (Milestone 4)
     auth_enabled: bool = False  # when true, /v1/* requires a valid API key

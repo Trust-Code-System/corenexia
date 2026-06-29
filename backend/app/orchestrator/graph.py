@@ -18,6 +18,7 @@ from langgraph.graph import END, START, StateGraph
 
 from app.config import settings
 from app.llm.base import LLMProvider, Message, TextBlock, ToolResultBlock, ToolUseBlock
+from app.orchestrator.mcp_aggregator import McpAggregator
 from app.orchestrator.skills import SkillStore
 from app.orchestrator.state import DEFAULT_SYSTEM_PROMPT, OrchestratorState
 from app.orchestrator.tools import (
@@ -69,13 +70,15 @@ def build_orchestrator(
     sandbox_timeout: int | None = None,
     skills: SkillStore | None = None,
     egress_approvals: EgressApprovalStore | None = None,
+    mcp_aggregator: McpAggregator | None = None,
 ):
     """Compile a LangGraph app bound to the given provider/sandbox/bus.
 
     Optional capabilities (Initiative D), each added only when injected:
       * `skills` → save_skill/load_skill tools + a skill catalog in the system prompt,
-      * `egress_approvals` → the request_egress tool (human-approval gate for outbound hosts).
-    Omitting both keeps the classic single-tool behavior.
+      * `egress_approvals` → the request_egress tool (human-approval gate for outbound hosts),
+      * `mcp_aggregator` → tools from connected upstream MCP servers, namespaced and proxied.
+    Omitting all keeps the classic single-tool behavior.
     """
     bus = bus or EventBus()
     tools = [EXECUTE_PYTHON_CODE]
@@ -83,6 +86,8 @@ def build_orchestrator(
         tools += [SAVE_SKILL, LOAD_SKILL]
     if egress_approvals:
         tools += [REQUEST_EGRESS]
+    if mcp_aggregator:
+        tools += mcp_aggregator.tool_specs()
 
     def _emit(run_id: str, phase: Phase, message: str = "", **data) -> None:
         bus.publish(OrchestratorEvent(run_id=run_id, phase=phase, message=message, data=data))
@@ -166,6 +171,15 @@ def build_orchestrator(
                 )
                 _emit(run_id, Phase.THINKING, "request_egress",
                       host=call.input.get("host", ""), is_error=is_error)
+                continue
+
+            # Aggregated upstream MCP tools — proxied to the owning upstream server.
+            if mcp_aggregator and mcp_aggregator.is_aggregated(call.name):
+                content, is_error = mcp_aggregator.call(call.name, call.input)
+                tool_results.append(
+                    ToolResultBlock(tool_use_id=call.id, content=content, is_error=is_error)
+                )
+                _emit(run_id, Phase.THINKING, f"mcp:{call.name}", is_error=is_error)
                 continue
 
             if call.name != EXECUTE_PYTHON_CODE.name:

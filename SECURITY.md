@@ -20,7 +20,7 @@ acknowledge within 72 hours and to coordinate disclosure.
 | **Resource exhaustion (CPU/memory/PID/wall-clock)** | `--memory` + `--memory-swap` (OOM-killed), `--cpus`, `--pids-limit`, per-run wall-clock timeout that force-kills the container, and a concurrency semaphore capping simultaneous containers. |
 | **Runaway agent loops** | Hard iteration cap in the orchestrator graph. |
 | **Unauthorized API / MCP access** | Bearer API keys (hashed at rest) on `/v1/*` and `/mcp` when `AUTH_ENABLED`; per-key rate limiting; admin key management behind `ADMIN_TOKEN`. Plus **OAuth 2.1 scoped, short-lived tokens** (`/oauth/token`, `client_credentials`) validated for signature, `iss` (RFC 9207), `aud`, `exp`, and scope; `/mcp` requires the `orchestrate:run` scope. |
-| **Tool poisoning / prompt injection (MCP)** | The orchestrator exposes a single first-party tool today (`execute_python_code`) — no untrusted upstream tool metadata enters the system prompt. See roadmap for aggregation guardrails. |
+| **Tool poisoning / prompt injection (MCP)** | First-party tools (`execute_python_code`, skills, `request_egress`) drive the system prompt. When **MCP aggregation** is enabled, upstream tools are treated as untrusted: their declarations are **namespaced** (`<upstream>__<tool>`) and exposed as tool definitions only — never injected into the system prompt as instructions. Aggregated calls run through the same boundaries (no sandbox bypass; outbound still gated by the egress allowlist). Pin/verify upstream servers you trust. |
 
 ## Isolation posture by platform
 

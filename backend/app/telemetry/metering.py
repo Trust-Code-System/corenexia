@@ -46,6 +46,18 @@ def _load_prices() -> dict[str, dict[str, float]]:
     return prices
 
 
+def blended_price(model: str) -> float:
+    """A single $/Mtok figure for ranking models by cost (weights output 3:1 over input).
+
+    Used by the multi-LLM router to prefer cheaper models. Unknown models rank as 0 (cheapest),
+    which is fine — they're treated as free and tried first only if explicitly configured.
+    """
+    rate = _load_prices().get(model)
+    if rate is None:
+        return 0.0
+    return (rate.get("input", 0.0) + 3 * rate.get("output", 0.0)) / 4
+
+
 def cost_for(model: str, usage: Usage) -> float:
     """Dollar cost of one turn's tokens for `model`. Unknown models cost $0 (warns once)."""
     prices = _load_prices()

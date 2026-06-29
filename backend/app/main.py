@@ -7,6 +7,7 @@ orchestrator. Components live on `app.state` for the routes to use.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -14,6 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.admin import admin_router
+from app.api.mcp import mcp_agg_router
 from app.api.oauth import oauth_router
 from app.api.routes import router
 from app.api.skills import skills_router
@@ -28,6 +30,7 @@ from app.mcp_server import engine as mcp_engine
 from app.mcp_server import mcp as mcp_server
 from app.observability import RequestIDMiddleware, setup_logging
 from app.orchestrator.graph import build_orchestrator
+from app.orchestrator.mcp_aggregator import McpAggregator, StreamableHttpUpstream, UpstreamSpec
 from app.orchestrator.runs import RunRegistry
 from app.orchestrator.skills import SkillStore
 from app.sandbox import build_sandbox
@@ -76,12 +79,29 @@ async def lifespan(app: FastAPI):
     # Dynamic-synthesis safety: a live egress allowlist + a human-approval gate (Initiative D).
     app.state.egress_policy = build_egress_policy()
     app.state.egress_approvals = EgressApprovalStore(app.state.egress_policy)
+
+    # MCP aggregation (Initiative D): connect upstream MCP servers and re-expose their tools.
+    app.state.mcp_aggregator = None
+    specs = settings.mcp_upstreams_list
+    if specs:
+        aggregator = McpAggregator(
+            [StreamableHttpUpstream(UpstreamSpec(**s)) for s in specs]
+        )
+        # discover() drives an async MCP client via asyncio.run, so run it off this event loop.
+        try:
+            count = await asyncio.to_thread(aggregator.discover)
+            app.state.mcp_aggregator = aggregator
+            logger.info("MCP aggregation: %d tools from %d upstream(s).", count, len(specs))
+        except Exception:  # noqa: BLE001 — never let a bad upstream block startup
+            logger.exception("MCP aggregation discovery failed; continuing without upstreams.")
+
     app.state.orchestrator = build_orchestrator(
         provider=app.state.provider,
         sandbox=app.state.sandbox,
         bus=app.state.bus,
         skills=app.state.skills,
         egress_approvals=app.state.egress_approvals,
+        mcp_aggregator=app.state.mcp_aggregator,
     )
 
     # Share the compiled orchestrator with the MCP tool surface, and run the MCP session
@@ -116,6 +136,7 @@ def create_app() -> FastAPI:
     app.include_router(router)
     app.include_router(templates_router)
     app.include_router(skills_router)
+    app.include_router(mcp_agg_router)
     app.include_router(oauth_router)
     app.include_router(admin_router)
     app.include_router(ws_router)

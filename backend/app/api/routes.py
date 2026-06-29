@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.gateway.auth import ApiKeyDep
 from app.gateway.keys import ApiKeyRecord
 from app.orchestrator.graph import run_orchestration
 from app.orchestrator.runs import start_background_run
+from app.telemetry.events import Phase
+
+_TERMINAL_PHASES = {Phase.DONE, Phase.ERROR}
 
 router = APIRouter()
 
@@ -163,6 +168,44 @@ async def start_run(
     return RunStartResponse(
         run_id=run_id, status="running", telemetry_ws=f"/ws/telemetry?run_id={run_id}"
     )
+
+
+@router.post("/v1/orchestrate/stream")
+async def orchestrate_stream(
+    body: OrchestrateRequest,
+    request: Request,
+    key: ApiKeyRecord | None = ApiKeyDep,
+) -> StreamingResponse:
+    """Stream a run's progress as Server-Sent Events: one frame per telemetry phase, then a final
+    `result` event with the answer. An HTTP alternative to the telemetry WebSocket."""
+    app = request.app
+    _require_sandbox(app)
+    _enforce_spend_cap(key)
+
+    bus = app.state.bus
+    queue = bus.subscribe()  # subscribe BEFORE starting so no early events are missed
+    run_id = await start_background_run(
+        app, body.query, body.context, max_iterations=body.max_iterations,
+        key_id=key.id if key else None,
+    )
+
+    async def _events():
+        try:
+            yield f"event: start\ndata: {json.dumps({'run_id': run_id})}\n\n"
+            while True:
+                event = await queue.get()
+                if event.run_id != run_id:
+                    continue
+                yield f"event: {event.phase.value}\ndata: {json.dumps(event.to_dict())}\n\n"
+                if event.phase in _TERMINAL_PHASES:
+                    break
+            record = app.state.runs.get(run_id)
+            result = record.result if record and record.result else {"run_id": run_id}
+            yield f"event: result\ndata: {json.dumps(result)}\n\n"
+        finally:
+            bus.unsubscribe(queue)
+
+    return StreamingResponse(_events(), media_type="text/event-stream")
 
 
 @router.get(

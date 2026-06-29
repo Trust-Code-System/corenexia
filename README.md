@@ -18,8 +18,8 @@ token/cost metering.
         │  LangGraph loop:  reason ──▶ execute ──▶ (loop) ──▶ respond────┘
         │                     │            │
         │              LLMProvider     SandboxRunner
-        │              (Claude;         (hardened Docker | gVisor | E2B)
-        │               Gemini stub)         │
+        │              (Claude + Gemini; (hardened Docker | gVisor | E2B)
+        │               cost-aware router)    │
         └─────────────────────────────────────▼─────────────────┐
                        one ephemeral, network-isolated container per run
 ```
@@ -47,6 +47,10 @@ productized, security-first.
   gate. See [OBSERVABILITY.md](OBSERVABILITY.md).
 - **Template packs** — ready-to-run **legal**, **finance**, and **general** task templates at
   `GET /v1/templates`, surfaced as starters in the God View. See [docs/templates.md](docs/templates.md).
+- **Differentiators** — a **reusable skills** toolbox (the agent saves working code as named skills),
+  **dynamic integration synthesis** behind an egress allowlist with a **human-approval gate**,
+  **MCP aggregation** (re-expose upstream MCP servers' tools), **multi-LLM routing** (Claude +
+  Gemini, cost-aware failover), OAuth 2.1 scoped tokens, and SSE run-streaming.
 
 ## Quickstart
 

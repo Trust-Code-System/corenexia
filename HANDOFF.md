@@ -105,17 +105,20 @@ Everything **struck through** below is done and verified.
   live API key — costs money).
 - Verified: **41 backend tests** (+7 templates), ruff clean, frontend build green, eval gate 6/6.
 
-### Initiative D — Differentiator Features  🔄 IN PROGRESS (mostly done)
-- ~~**Reusable skills + progressive tool disclosure** (items 1–2): `save_skill`/`load_skill`,
-  catalog (names+descriptions only) in the prompt; `SkillStore` + `/v1/skills`
-  (`app/orchestrator/skills.py`, `app/api/skills.py`). 5 tests~~
-- ~~**Dynamic integration synthesis + human-approval gate** (item 3): `request_egress` tool files a
-  request instead of connecting; admin approves → host added to the live `EgressPolicy` the proxy
-  enforces (`app/sandbox/egress_approval.py`, `/admin/egress/*`). 5 tests~~
-- ~~**Gemini provider** (item 4a): real `google-genai` implementation, translation unit-tested;
-  live call gated (`app/llm/gemini_provider.py`). 6 tests~~
-- [ ] **True MCP aggregation** (connect upstream MCP servers, re-expose) — item 4b, remaining
-- [ ] **Multi-LLM routing + streaming** (cost/latency-aware provider selection) — item 4c, remaining
+### Initiative D — Differentiator Features  ✅ COMPLETE & VERIFIED
+- ~~**Reusable skills + progressive tool disclosure** (1–2): `save_skill`/`load_skill`, catalog in
+  prompt; `SkillStore` + `/v1/skills`. 5 tests~~
+- ~~**Dynamic integration synthesis + human-approval gate** (3): `request_egress` → admin approval
+  adds host to the live `EgressPolicy` the proxy enforces (`/admin/egress/*`). 5 tests~~
+- ~~**Gemini provider** (4a): real `google-genai` implementation, translation unit-tested; live gated~~
+- ~~**True MCP aggregation** (4b): `McpAggregator` connects upstream MCP servers, namespaces +
+  re-exposes their tools (`<up>__<tool>`), proxies calls; `/v1/mcp/upstreams`
+  (`app/orchestrator/mcp_aggregator.py`). 7 tests~~
+- ~~**Multi-LLM routing** (4c): `RoutingProvider` cost-aware ordering + error failover
+  (`app/llm/router.py`, `LLM_ROUTING_*`). 6 tests~~
+- ~~**Streaming** (4c): SSE `POST /v1/orchestrate/stream` (run-level, reuses the event bus). 1 test~~
+- Remaining stretch: **token-level** LLM streaming (needs the sync graph reworked — separate effort).
+- Verified: **83 backend tests**, ruff clean, frontend build green.
 
 ### Initiative E — Cloud & Enterprise (open-core monetization)  ⬜ LATER
 - [ ] Managed cloud (hosted sandboxes), org/RBAC, SSO, audit logs, SOC 2 path, usage/seat billing, EU-AI-Act/Colorado-AI-Act readiness
@@ -157,23 +160,19 @@ First, read these to load full context:
 - the strategy plan at ~/.claude/plans/project-nexus-the-cuddly-popcorn.md
 
 Status: Milestones 1–5 complete; Initiatives A (security moat + OAuth 2.1 + egress proxy),
-B (observability & evals), C (adoption & DX) complete; D (differentiator) IN PROGRESS — reusable
-skills + progressive disclosure shipped (items 1–2). 58 backend tests pass; ruff clean; frontend
-builds; offline eval gate 6/6; all 3 Docker images build. The repo is now a local git repo with
-commits; publish to GitHub/registries is STAGED for github.com/Trust-Code-System/corenexia
-(packaging/registry/RUNBOOK.md) and awaiting an explicit "go" — nothing pushed yet.
+B (observability & evals), C (adoption & DX), and D (differentiator) ALL complete. 83 backend
+tests pass; ruff clean; frontend builds; offline eval gate 6/6; all 3 Docker images build. The
+code is PUBLIC at github.com/Trust-Code-System/corenexia (pushed). MCP Registry + Smithery
+listings are staged but NOT submitted — they need interactive auth (see packaging/registry/RUNBOOK.md).
 
-Continue Initiative D — remaining items:
-  3) Dynamic integration synthesis behind the sandbox + egress allowlist (already built) +
-     a human-approval gate for any new outbound domain
-  4) True MCP aggregation (connect upstream MCP servers, re-expose); finish the Gemini provider;
-     cost/latency-aware multi-LLM routing + streaming
+Open work (pick per the user):
+  - Initiative E — Cloud & enterprise (managed sandboxes, org/RBAC, SSO, audit, billing, SOC 2).
+  - Token-level LLM streaming (stretch; needs the sync graph reworked).
+  - Gated/outward-facing: submit MCP Registry + Smithery listings (RUNBOOK.md; gh authed as
+    Lingz450; needs `write:packages` refresh + `mcp-publisher login`), demo GIF, full
+    `docker compose up` end-to-end (live API call), one real orchestration in the God View.
 
-Gated/outward-facing (need explicit go-ahead): push public repo + publish MCP Registry + Smithery
-(follow packaging/registry/RUNBOOK.md; gh is authed as Lingz450), record a demo GIF, run the full
-`docker compose up` end-to-end (socket-mounted backend; costs a live API call).
-
-Rules: keep the existing 58 tests + frontend build green; run ruff. Do NOT make live LLM
+Rules: keep the existing 83 tests + frontend build green; run ruff. Do NOT make live LLM
 calls or any outward-facing/paid action (incl. publishing to registries) without my explicit
 approval (my ANTHROPIC_API_KEY is in backend/.env). Windows local uses hardened Docker;
 gVisor/microVM are Linux/CI/cloud. Verify each change with pytest before reporting.
