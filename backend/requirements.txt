@@ -5,6 +5,7 @@
 fastapi>=0.110
 uvicorn[standard]>=0.29
 anthropic>=0.69
+google-genai>=1.0  # Gemini provider (optional; only imported when LLM_PROVIDER=gemini)
 langgraph>=0.2.40
 mcp>=1.2
 pydantic>=2.6
