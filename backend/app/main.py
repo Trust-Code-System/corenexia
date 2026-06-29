@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.admin import admin_router
 from app.api.oauth import oauth_router
 from app.api.routes import router
+from app.api.skills import skills_router
 from app.api.templates import templates_router
 from app.api.ws import ws_router
 from app.config import settings
@@ -28,6 +29,7 @@ from app.mcp_server import mcp as mcp_server
 from app.observability import RequestIDMiddleware, setup_logging
 from app.orchestrator.graph import build_orchestrator
 from app.orchestrator.runs import RunRegistry
+from app.orchestrator.skills import SkillStore
 from app.sandbox import build_sandbox
 from app.telemetry.events import EventBus
 from app.telemetry.otel import setup_tracing
@@ -68,10 +70,12 @@ async def lifespan(app: FastAPI):
         logger.error("Sandbox preflight FAILED: %s", message)
         logger.error("The server will start but /v1/orchestrate returns 503 until this is fixed.")
 
+    app.state.skills = SkillStore(settings.skills_db) if settings.skills_enabled else None
     app.state.orchestrator = build_orchestrator(
         provider=app.state.provider,
         sandbox=app.state.sandbox,
         bus=app.state.bus,
+        skills=app.state.skills,
     )
 
     # Share the compiled orchestrator with the MCP tool surface, and run the MCP session
@@ -105,6 +109,7 @@ def create_app() -> FastAPI:
 
     app.include_router(router)
     app.include_router(templates_router)
+    app.include_router(skills_router)
     app.include_router(oauth_router)
     app.include_router(admin_router)
     app.include_router(ws_router)

@@ -1,10 +1,16 @@
-"""The orchestrator's tool surface. Milestone 1 ships a single tool: execute_python_code."""
+"""The orchestrator's tool surface.
+
+`execute_python_code` is the core tool. When a `SkillStore` is wired in (Initiative D), two more
+tools let the agent build a reusable toolbox: `save_skill` (persist working code under a name) and
+`load_skill` (pull a saved skill's code on demand — progressive disclosure).
+"""
 
 from __future__ import annotations
 
 import json
 
 from app.llm.base import ToolSpec
+from app.orchestrator.skills import InvalidSkillName, SkillStore
 from app.sandbox.base import SandboxRunner
 
 EXECUTE_PYTHON_CODE = ToolSpec(
@@ -58,3 +64,67 @@ def _truncate(text: str) -> str:
     if len(text) <= _MAX_OUTPUT_CHARS:
         return text
     return text[:_MAX_OUTPUT_CHARS] + f"\n...[truncated {len(text) - _MAX_OUTPUT_CHARS} chars]"
+
+
+# --- Reusable skills (Initiative D) --------------------------------------
+
+SAVE_SKILL = ToolSpec(
+    name="save_skill",
+    description=(
+        "Save a working, self-contained Python script as a named, reusable skill so you can reuse "
+        "it later instead of rewriting it. Use after a script succeeds and is likely useful again."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "Unique skill name ([a-zA-Z0-9_.-], <=64)."},
+            "description": {"type": "string", "description": "One line: what the skill does."},
+            "code": {"type": "string", "description": "The complete Python 3.11 source to save."},
+            "tags": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["name", "description", "code"],
+        "additionalProperties": False,
+    },
+)
+
+LOAD_SKILL = ToolSpec(
+    name="load_skill",
+    description=(
+        "Load the full Python source of a previously saved skill by name (the catalog of available "
+        "skills is in your system prompt). Then run or adapt it with execute_python_code."
+    ),
+    input_schema={
+        "type": "object",
+        "properties": {"name": {"type": "string", "description": "The saved skill's name."}},
+        "required": ["name"],
+        "additionalProperties": False,
+    },
+)
+
+SKILL_TOOL_NAMES = {SAVE_SKILL.name, LOAD_SKILL.name}
+
+
+def run_skill_tool(tool_name: str, tool_input: dict, skills: SkillStore) -> tuple[str, bool]:
+    """Handle a skill tool call. Returns (tool_result_content, is_error)."""
+    if tool_name == SAVE_SKILL.name:
+        try:
+            skill = skills.save(
+                tool_input.get("name", ""),
+                tool_input.get("description", ""),
+                tool_input.get("code", ""),
+                tool_input.get("tags") or [],
+            )
+        except (InvalidSkillName, ValueError) as exc:
+            return f"Could not save skill: {exc}", True
+        return json.dumps({"saved": skill.name, "status": "ok"}), False
+
+    if tool_name == LOAD_SKILL.name:
+        skill = skills.get(tool_input.get("name", ""))
+        if skill is None:
+            return json.dumps({"error": "skill not found"}), True
+        skills.record_use(skill.name)
+        return json.dumps(
+            {"name": skill.name, "description": skill.description, "code": skill.code}
+        ), False
+
+    return f"Unknown skill tool '{tool_name}'.", True

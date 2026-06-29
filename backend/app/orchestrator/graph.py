@@ -18,8 +18,16 @@ from langgraph.graph import END, START, StateGraph
 
 from app.config import settings
 from app.llm.base import LLMProvider, Message, TextBlock, ToolResultBlock, ToolUseBlock
+from app.orchestrator.skills import SkillStore
 from app.orchestrator.state import DEFAULT_SYSTEM_PROMPT, OrchestratorState
-from app.orchestrator.tools import EXECUTE_PYTHON_CODE, run_execute_python_code
+from app.orchestrator.tools import (
+    EXECUTE_PYTHON_CODE,
+    LOAD_SKILL,
+    SAVE_SKILL,
+    SKILL_TOOL_NAMES,
+    run_execute_python_code,
+    run_skill_tool,
+)
 from app.sandbox.base import SandboxRunner
 from app.telemetry import otel
 from app.telemetry.events import EventBus, OrchestratorEvent, Phase
@@ -28,6 +36,19 @@ from app.telemetry.metering import UsageTotals
 TOOLS = [EXECUTE_PYTHON_CODE]
 
 _PREVIEW_CHARS = 600
+
+
+def _skill_system_suffix(skills: SkillStore) -> str:
+    """Append the skill catalog (names + descriptions only — progressive disclosure) + how-to."""
+    suffix = (
+        "\n\nReusable skills: you can save a working script as a named skill with save_skill("
+        "name, description, code) and reload it later with load_skill(name) instead of rewriting "
+        "it."
+    )
+    catalog = skills.catalog()
+    if catalog:
+        suffix += "\n\nSaved skills available via load_skill(name):\n" + catalog
+    return suffix
 
 
 def _preview(text: str) -> str:
@@ -43,9 +64,16 @@ def build_orchestrator(
     sandbox: SandboxRunner,
     bus: EventBus | None = None,
     sandbox_timeout: int | None = None,
+    skills: SkillStore | None = None,
 ):
-    """Compile a LangGraph app bound to the given provider/sandbox/bus."""
+    """Compile a LangGraph app bound to the given provider/sandbox/bus.
+
+    When a `SkillStore` is provided, the agent also gets the save_skill/load_skill tools and a
+    catalog of saved skills in its system prompt (Initiative D). Omitting it keeps the classic
+    single-tool behavior.
+    """
     bus = bus or EventBus()
+    tools = [EXECUTE_PYTHON_CODE, SAVE_SKILL, LOAD_SKILL] if skills else [EXECUTE_PYTHON_CODE]
 
     def _emit(run_id: str, phase: Phase, message: str = "", **data) -> None:
         bus.publish(OrchestratorEvent(run_id=run_id, phase=phase, message=message, data=data))
@@ -55,12 +83,16 @@ def build_orchestrator(
         _emit(run_id, Phase.THINKING, "Reasoning about the next step",
               iteration=state["iterations"])
 
+        system = state["system"]
+        if skills:
+            system += _skill_system_suffix(skills)
+
         request_model = getattr(provider, "_model", "") or ""
         with otel.llm_chat_span(request_model, system=provider.name) as llm_span:
             result = provider.complete(
-                system=state["system"],
+                system=system,
                 messages=state["messages"],
-                tools=TOOLS,
+                tools=tools,
                 max_tokens=settings.llm_max_tokens,
             )
             llm_span.record_result(
@@ -101,6 +133,16 @@ def build_orchestrator(
         tool_results: list[ToolResultBlock] = []
         steps = list(state["steps"])
         for call in tool_calls:
+            # Reusable-skill tools (save/load) — handled in-process, not sandbox steps.
+            if skills and call.name in SKILL_TOOL_NAMES:
+                content, is_error = run_skill_tool(call.name, call.input, skills)
+                tool_results.append(
+                    ToolResultBlock(tool_use_id=call.id, content=content, is_error=is_error)
+                )
+                _emit(run_id, Phase.THINKING, f"skill:{call.name}",
+                      tool=call.name, is_error=is_error)
+                continue
+
             if call.name != EXECUTE_PYTHON_CODE.name:
                 tool_results.append(
                     ToolResultBlock(

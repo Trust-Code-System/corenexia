@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     # Orchestrator
     max_iterations: int = 6
     runs_db: str = "corenexia_runs.db"  # persistent run/audit store
+    # Reusable skills (Initiative D): the agent's persistent, self-built toolbox.
+    skills_enabled: bool = True
+    skills_db: str = "corenexia_skills.db"
 
     # Gateway (Milestone 4)
     auth_enabled: bool = False  # when true, /v1/* requires a valid API key
