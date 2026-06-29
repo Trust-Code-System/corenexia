@@ -10,6 +10,8 @@ mcp>=1.2
 pydantic>=2.6
 pydantic-settings>=2.2
 python-dotenv>=1.0
+python-multipart>=0.0.9  # OAuth token endpoint (form parsing)
+pyjwt>=2.8  # MCP OAuth 2.1 scoped access tokens
 
 # Observability (Initiative B) — OpenTelemetry GenAI tracing + OTLP/HTTP export.
 opentelemetry-api>=1.30

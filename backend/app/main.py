@@ -14,6 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.admin import admin_router
+from app.api.oauth import oauth_router
 from app.api.routes import router
 from app.api.templates import templates_router
 from app.api.ws import ws_router
@@ -104,6 +105,7 @@ def create_app() -> FastAPI:
 
     app.include_router(router)
     app.include_router(templates_router)
+    app.include_router(oauth_router)
     app.include_router(admin_router)
     app.include_router(ws_router)
 

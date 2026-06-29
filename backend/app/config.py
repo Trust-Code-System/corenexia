@@ -42,6 +42,16 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 60  # per-key; 0 disables
     api_keys_db: str = "corenexia_keys.db"
 
+    # MCP OAuth 2.1 (Initiative A follow-up). When auth is enabled, clients may exchange an API
+    # key for a short-lived, scoped JWT at /oauth/token and present it as a Bearer token; static
+    # API keys keep working for backward compatibility. RFC 8414/9728 metadata is published.
+    oauth_issuer: str = "http://localhost:8000"  # token `iss`; also the metadata base URL
+    oauth_audience: str = "corenexia-mcp"  # required token `aud`
+    # HS256 signing secret. MUST be set to a long random value in production; if empty we fall
+    # back to the admin token, or (last resort) a per-process random key (tokens die on restart).
+    oauth_signing_key: str | None = None
+    oauth_token_ttl_seconds: int = 3600  # short-lived access tokens (1h default)
+
     # Hardening (Milestone 5)
     # Comma-separated browser origins allowed by CORS (the God View frontend).
     allowed_origins: str = "http://localhost:3000"

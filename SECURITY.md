@@ -19,7 +19,7 @@ acknowledge within 72 hours and to coordinate disclosure.
 | **Host secrets / API keys leak into the sandbox** | The container inherits **no** host environment; the runner passes no `--env`. Asserted by `tests/test_security.py::test_host_secrets_not_visible_in_sandbox`. |
 | **Resource exhaustion (CPU/memory/PID/wall-clock)** | `--memory` + `--memory-swap` (OOM-killed), `--cpus`, `--pids-limit`, per-run wall-clock timeout that force-kills the container, and a concurrency semaphore capping simultaneous containers. |
 | **Runaway agent loops** | Hard iteration cap in the orchestrator graph. |
-| **Unauthorized API / MCP access** | Bearer API keys (hashed at rest) on `/v1/*` and `/mcp` when `AUTH_ENABLED`; per-key rate limiting; admin key management behind `ADMIN_TOKEN`. |
+| **Unauthorized API / MCP access** | Bearer API keys (hashed at rest) on `/v1/*` and `/mcp` when `AUTH_ENABLED`; per-key rate limiting; admin key management behind `ADMIN_TOKEN`. Plus **OAuth 2.1 scoped, short-lived tokens** (`/oauth/token`, `client_credentials`) validated for signature, `iss` (RFC 9207), `aud`, `exp`, and scope; `/mcp` requires the `orchestrate:run` scope. |
 | **Tool poisoning / prompt injection (MCP)** | The orchestrator exposes a single first-party tool today (`execute_python_code`) — no untrusted upstream tool metadata enters the system prompt. See roadmap for aggregation guardrails. |
 
 ## Isolation posture by platform
@@ -47,9 +47,11 @@ The suite proves: host secrets are not visible, the process is non-root, the roo
 
 ## Roadmap (hardening follow-ups)
 
-- **MCP OAuth 2.1**: scoped, short-lived tokens with `iss` validation (RFC 9207), replacing
-  static bearer keys for MCP clients. (Today `/mcp` is closed with bearer API keys when auth is
-  enabled.)
+- **MCP OAuth 2.1** ✅ *implemented*: scoped, short-lived JWTs via `/oauth/token`
+  (`client_credentials`), validated for signature, `iss` (RFC 9207), `aud`, `exp`, and scope;
+  `/mcp` requires `orchestrate:run`. Discovery via RFC 8414/9728 metadata. Static API keys still
+  work for backward compatibility. *Follow-ups:* per-`/v1`-route scope enforcement; RS256/JWKS +
+  dynamic client registration for third-party authorization servers.
 - **Egress allowlist proxy**: required before any dynamic outbound integration is enabled.
 - **Tool/supply-chain integrity**: pin + hash tool definitions; verify/scan any externally
   sourced code or MCP servers before they run; keep everything behind the sandbox boundary.

@@ -12,7 +12,36 @@ import secrets
 
 from fastapi import Depends, Header, HTTPException, Request
 
+from app.gateway import oauth
 from app.gateway.keys import ApiKeyRecord
+
+
+def resolve_principal(
+    app_state, credential: str, *, required_scope: str | None = None
+) -> ApiKeyRecord | None:
+    """Authenticate a Bearer credential as either a static API key or a scoped OAuth token.
+
+    Both resolve to the owning `ApiKeyRecord` so rate limiting, metering, and spend caps work
+    uniformly. Returns None if neither path validates (or the token lacks `required_scope`).
+    """
+    keys = getattr(app_state, "keys", None)
+    if keys is None:
+        return None
+
+    # 1) Static API key (cnx_…) — verify() also meters the request.
+    record = keys.verify(credential)
+    if record is not None:
+        return record
+
+    # 2) Scoped, short-lived OAuth access token (JWT).
+    try:
+        claims = oauth.validate_token(credential, required_scope=required_scope)
+    except oauth.OAuthError:
+        return None
+    record = keys.get(claims.subject)
+    if record is None or record.revoked:
+        return None
+    return record
 
 
 async def require_api_key(request: Request) -> ApiKeyRecord | None:
@@ -23,14 +52,14 @@ async def require_api_key(request: Request) -> ApiKeyRecord | None:
     if not auth.startswith("Bearer "):
         raise HTTPException(
             status_code=401,
-            detail="Missing API key. Send 'Authorization: Bearer <key>'.",
+            detail="Missing credentials. Send 'Authorization: Bearer <api_key | token>'.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    raw_key = auth[len("Bearer ") :].strip()
-    record = request.app.state.keys.verify(raw_key)
+    credential = auth[len("Bearer ") :].strip()
+    record = resolve_principal(request.app.state, credential)
     if record is None:
-        raise HTTPException(status_code=401, detail="Invalid or revoked API key.")
+        raise HTTPException(status_code=401, detail="Invalid or revoked API key/token.")
 
     if not request.app.state.rate_limiter.allow(record.id):
         raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again shortly.")
@@ -90,8 +119,11 @@ class MCPAuthMiddleware:
             if authorization.startswith("Bearer ")
             else ""
         )
-        keys = getattr(getattr(starlette_app, "state", None), "keys", None)
-        if raw_key and keys is not None and keys.verify(raw_key) is not None:
+        app_state = getattr(starlette_app, "state", None)
+        # Accept a static API key or a scoped token carrying orchestrate:run.
+        if raw_key and app_state is not None and resolve_principal(
+            app_state, raw_key, required_scope=oauth.SCOPE_RUN
+        ) is not None:
             await self.app(scope, receive, send)
             return
 
