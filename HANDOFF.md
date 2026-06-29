@@ -105,13 +105,17 @@ Everything **struck through** below is done and verified.
   live API key — costs money).
 - Verified: **41 backend tests** (+7 templates), ruff clean, frontend build green, eval gate 6/6.
 
-### Initiative D — Differentiator Features  🔄 IN PROGRESS
-- ~~**Reusable skills + progressive tool disclosure** (D items 1–2): agent saves working code as
-  named skills (`save_skill`) and reloads on demand (`load_skill`); system prompt shows a compact
-  catalog (names+descriptions only). `SkillStore` (SQLite), `/v1/skills` REST, opt-in via
-  injection (`app/orchestrator/skills.py`, `app/api/skills.py`). 5 tests~~
-- [ ] Dynamic integration synthesis with egress allowlist + human-approval gate (egress proxy ready)
-- [ ] True MCP aggregation (connect upstream MCP servers, re-expose); finish Gemini provider; multi-LLM routing + streaming
+### Initiative D — Differentiator Features  🔄 IN PROGRESS (mostly done)
+- ~~**Reusable skills + progressive tool disclosure** (items 1–2): `save_skill`/`load_skill`,
+  catalog (names+descriptions only) in the prompt; `SkillStore` + `/v1/skills`
+  (`app/orchestrator/skills.py`, `app/api/skills.py`). 5 tests~~
+- ~~**Dynamic integration synthesis + human-approval gate** (item 3): `request_egress` tool files a
+  request instead of connecting; admin approves → host added to the live `EgressPolicy` the proxy
+  enforces (`app/sandbox/egress_approval.py`, `/admin/egress/*`). 5 tests~~
+- ~~**Gemini provider** (item 4a): real `google-genai` implementation, translation unit-tested;
+  live call gated (`app/llm/gemini_provider.py`). 6 tests~~
+- [ ] **True MCP aggregation** (connect upstream MCP servers, re-expose) — item 4b, remaining
+- [ ] **Multi-LLM routing + streaming** (cost/latency-aware provider selection) — item 4c, remaining
 
 ### Initiative E — Cloud & Enterprise (open-core monetization)  ⬜ LATER
 - [ ] Managed cloud (hosted sandboxes), org/RBAC, SSO, audit logs, SOC 2 path, usage/seat billing, EU-AI-Act/Colorado-AI-Act readiness

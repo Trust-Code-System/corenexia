@@ -171,11 +171,14 @@ synthesis · DX+templates+registry · open-core vertical flagship.
 - [ ] Gated/outward-facing: publish to registries; demo GIF; full compose `up` end-to-end (live key)
 - Verified: 41 backend tests, ruff clean, frontend build green, eval gate 6/6.
 
-### Initiative D — Differentiator features  `[~] IN PROGRESS`
+### Initiative D — Differentiator features  `[~] IN PROGRESS (mostly done)`
 - [x] Reusable skills + progressive tool disclosure: `save_skill`/`load_skill`, catalog in prompt,
   `SkillStore` + `/v1/skills` (`app/orchestrator/skills.py`, `app/api/skills.py`)
-- [ ] Dynamic integration synthesis behind the sandbox + egress allowlist + human-approval gate
-- [ ] True MCP aggregation; finish Gemini provider; cost/latency-aware multi-LLM routing + streaming
+- [x] Dynamic integration synthesis + human-approval gate: `request_egress` tool → admin approval
+  adds the host to the live `EgressPolicy` the proxy enforces (`app/sandbox/egress_approval.py`)
+- [x] Gemini provider implemented against `google-genai` (translation unit-tested; live call gated)
+- [ ] True MCP aggregation (connect upstream MCP servers, re-expose)
+- [ ] Cost/latency-aware multi-LLM routing + streaming
 
 ### Initiative E (next)
 - **E — Cloud/enterprise (open-core monetization):** managed sandboxes, RBAC/SSO, audit, billing
