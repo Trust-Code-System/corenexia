@@ -15,7 +15,7 @@ acknowledge within 72 hours and to coordinate disclosure.
 | Threat | Mitigation |
 |---|---|
 | **Untrusted code escapes the sandbox to the host** | One ephemeral container per run, dropped at the end (`--rm`). Non-root (`--user 65534`), all capabilities dropped (`--cap-drop ALL`), `no-new-privileges`, read-only rootfs, Docker's default seccomp filter. Optional **gVisor (`runsc`)** runtime for syscall-level isolation in Linux deploy/CI. |
-| **Data exfiltration / SSRF from generated code** | No network by default (`--network none`). Any future outbound must go through an allowlist egress proxy — never raw networking. |
+| **Data exfiltration / SSRF from generated code** | No network by default (`--network none`). When outbound is explicitly enabled (`SANDBOX_EGRESS_ENABLED`), traffic is forced through an **allowlist egress proxy** (`app/sandbox/egress.py`) that permits only configured hosts and refuses everything else — never raw networking. |
 | **Host secrets / API keys leak into the sandbox** | The container inherits **no** host environment; the runner passes no `--env`. Asserted by `tests/test_security.py::test_host_secrets_not_visible_in_sandbox`. |
 | **Resource exhaustion (CPU/memory/PID/wall-clock)** | `--memory` + `--memory-swap` (OOM-killed), `--cpus`, `--pids-limit`, per-run wall-clock timeout that force-kills the container, and a concurrency semaphore capping simultaneous containers. |
 | **Runaway agent loops** | Hard iteration cap in the orchestrator graph. |
@@ -52,7 +52,12 @@ The suite proves: host secrets are not visible, the process is non-root, the roo
   `/mcp` requires `orchestrate:run`. Discovery via RFC 8414/9728 metadata. Static API keys still
   work for backward compatibility. *Follow-ups:* per-`/v1`-route scope enforcement; RS256/JWKS +
   dynamic client registration for third-party authorization servers.
-- **Egress allowlist proxy**: required before any dynamic outbound integration is enabled.
+- **Egress allowlist proxy** ✅ *implemented* (`app/sandbox/egress.py`): off by default
+  (`--network none`); when `SANDBOX_EGRESS_ENABLED=true` the sandbox is routed through a filtering
+  forward proxy that allows only `SANDBOX_EGRESS_ALLOWLIST` hosts (exact or `*.suffix`) and fails
+  closed without a proxy URL. *Deployment note:* the egress network must be locked down so the
+  proxy is the container's only route out (Linux/cloud); on Docker Desktop this confinement is a
+  deployment concern. Pairs with Initiative D dynamic synthesis (+ human-approval gate).
 - **Tool/supply-chain integrity**: pin + hash tool definitions; verify/scan any externally
   sourced code or MCP servers before they run; keep everything behind the sandbox boundary.
 - **gVisor in CI**: run the sandbox suite under `runsc` on the Linux CI job in addition to Docker.

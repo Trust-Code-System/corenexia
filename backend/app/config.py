@@ -32,6 +32,19 @@ class Settings(BaseSettings):
     # "unconfined" (disabled — not recommended), or an absolute path to a custom profile JSON.
     sandbox_seccomp_profile: str = "default"
 
+    # Egress allowlist proxy (Initiative A follow-up). OFF by default → sandbox stays no-network.
+    # When enabled, the container is attached to `sandbox_egress_network` and its HTTP(S)_PROXY is
+    # pointed at `sandbox_egress_proxy_url`; the proxy permits only allowlisted hosts. The network
+    # MUST be locked down so the only route out is the proxy (a deployment concern; see SECURITY).
+    sandbox_egress_enabled: bool = False
+    sandbox_egress_allowlist: str = ""  # comma-separated hosts; supports "*.example.com"
+    sandbox_egress_proxy_url: str = ""  # e.g. http://host.docker.internal:8888
+    sandbox_egress_network: str = "bridge"  # docker network attached when egress is enabled
+
+    @property
+    def sandbox_egress_allowlist_list(self) -> list[str]:
+        return [h.strip() for h in self.sandbox_egress_allowlist.split(",") if h.strip()]
+
     # Orchestrator
     max_iterations: int = 6
     runs_db: str = "corenexia_runs.db"  # persistent run/audit store

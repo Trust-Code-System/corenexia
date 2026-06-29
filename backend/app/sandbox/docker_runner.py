@@ -40,6 +40,9 @@ class DockerRunner(SandboxRunner):
         max_concurrency: int | None = None,
         runtime: str | None = None,
         seccomp_profile: str | None = None,
+        egress_enabled: bool | None = None,
+        egress_proxy_url: str | None = None,
+        egress_network: str | None = None,
     ):
         self.image = image or settings.sandbox_image
         self.memory = memory or settings.sandbox_memory
@@ -49,9 +52,34 @@ class DockerRunner(SandboxRunner):
         # OCI runtime: None/"docker" => Docker's default (runc); "runsc" => gVisor.
         self.runtime = runtime
         self.seccomp_profile = seccomp_profile or settings.sandbox_seccomp_profile
+        # Egress: OFF by default → --network none. When enabled with a proxy URL, the container is
+        # attached to `egress_network` and routed through the allowlist proxy (see egress.py).
+        self.egress_enabled = (
+            settings.sandbox_egress_enabled if egress_enabled is None else egress_enabled
+        )
+        self.egress_proxy_url = (
+            settings.sandbox_egress_proxy_url if egress_proxy_url is None else egress_proxy_url
+        )
+        self.egress_network = egress_network or settings.sandbox_egress_network
         # Cap simultaneous containers so a burst of runs can't exhaust host resources.
         limit = max_concurrency if max_concurrency is not None else settings.sandbox_max_concurrency
         self._slots = threading.Semaphore(max(1, limit))
+
+    def _network_args(self) -> list[str]:
+        """Network flags. Default is full isolation; egress mode routes through the allowlist proxy.
+
+        SECURITY: egress mode only enforces the allowlist if `egress_network` is locked down so the
+        proxy is the container's only route out. Without a proxy URL we fail closed to no-network.
+        """
+        if not (self.egress_enabled and self.egress_proxy_url):
+            return ["--network", "none"]  # no egress (exfiltration boundary) — the default
+        proxy = self.egress_proxy_url
+        return [
+            "--network", self.egress_network,
+            "-e", f"HTTP_PROXY={proxy}", "-e", f"http_proxy={proxy}",
+            "-e", f"HTTPS_PROXY={proxy}", "-e", f"https_proxy={proxy}",
+            "-e", "NO_PROXY=localhost,127.0.0.1", "-e", "no_proxy=localhost,127.0.0.1",
+        ]
 
     def _security_opts(self) -> list[str]:
         """Hardening flags shared by every run."""
@@ -125,7 +153,7 @@ class DockerRunner(SandboxRunner):
         cmd = [
             "docker", "run", "--rm", "-i",
             "--name", name,
-            "--network", "none",               # no egress (exfiltration boundary)
+            *self._network_args(),             # --network none by default; proxy if egress enabled
             "--memory", self.memory,
             "--memory-swap", self.memory,      # equal to --memory disables swap
             "--cpus", str(self.cpus),
