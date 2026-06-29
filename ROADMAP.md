@@ -148,8 +148,10 @@ synthesis · DX+templates+registry · open-core vertical flagship.
 - [x] `tests/test_security.py` (8): host-secret non-inheritance, non-root, read-only rootfs,
       `/tmp` writable, egress blocked, memory cap enforced, MCP auth — **all run, not skipped**
 - [x] CI: dedicated **gVisor job** runs the security+sandbox suite under `runsc` on Linux
-- [ ] Full **MCP OAuth 2.1** (scoped tokens, `iss`/RFC 9207) — documented follow-up
-- [ ] Egress allowlist proxy (pairs with Initiative D dynamic synthesis)
+- [x] **MCP OAuth 2.1** — scoped/short-lived JWTs (`/oauth/token`), sig/`iss`(RFC 9207)/`aud`/`exp`/
+  scope validation, RFC 8414/9728 metadata, `/mcp` needs `orchestrate:run`; static keys still work
+- [x] **Egress allowlist proxy** — opt-in (`SANDBOX_EGRESS_*`); default `--network none`; filtering
+  CONNECT proxy permits only allowlisted hosts (`app/sandbox/egress.py`)
 
 ### Initiative B — Observability & evals  `[x] COMPLETE & VERIFIED`
 - [x] OTel GenAI spans (agent/LLM-chat/tool) + OTLP/HTTP export, off by default (`app/telemetry/otel.py`)
@@ -169,8 +171,13 @@ synthesis · DX+templates+registry · open-core vertical flagship.
 - [ ] Gated/outward-facing: publish to registries; demo GIF; full compose `up` end-to-end (live key)
 - Verified: 41 backend tests, ruff clean, frontend build green, eval gate 6/6.
 
-### Initiatives D–E (next)
-- **D — Differentiator:** code-mode/progressive tool disclosure, reusable skills, dynamic synthesis, MCP aggregation
+### Initiative D — Differentiator features  `[~] IN PROGRESS`
+- [x] Reusable skills + progressive tool disclosure: `save_skill`/`load_skill`, catalog in prompt,
+  `SkillStore` + `/v1/skills` (`app/orchestrator/skills.py`, `app/api/skills.py`)
+- [ ] Dynamic integration synthesis behind the sandbox + egress allowlist + human-approval gate
+- [ ] True MCP aggregation; finish Gemini provider; cost/latency-aware multi-LLM routing + streaming
+
+### Initiative E (next)
 - **E — Cloud/enterprise (open-core monetization):** managed sandboxes, RBAC/SSO, audit, billing
 
 ---

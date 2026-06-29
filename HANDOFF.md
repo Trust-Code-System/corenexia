@@ -69,8 +69,12 @@ Everything **struck through** below is done and verified.
 - ~~`SECURITY.md` threat model + responsible disclosure~~
 - ~~`tests/test_security.py` (8): host-secret non-inheritance, non-root, read-only rootfs, `/tmp` writable, egress blocked, memory cap, MCP auth — all run~~
 - ~~CI gVisor job (runs security+sandbox suite under `runsc` on Linux)~~
-- [ ] **Full MCP OAuth 2.1** — scoped/short-lived tokens, `iss` validation (RFC 9207)
-- [ ] **Egress allowlist proxy** (pairs with Initiative D)
+- ~~**MCP OAuth 2.1** — scoped/short-lived JWTs via `/oauth/token` (`client_credentials`),
+  validated for sig/`iss`(RFC 9207)/`aud`/`exp`/scope; RFC 8414/9728 metadata; `/mcp` needs
+  `orchestrate:run`; static keys still work (`app/gateway/oauth.py`, `app/api/oauth.py`)~~
+- ~~**Egress allowlist proxy** — opt-in (`SANDBOX_EGRESS_*`); default stays `--network none`;
+  filtering CONNECT proxy permits only allowlisted hosts (`app/sandbox/egress.py`)~~
+- Follow-ups: per-`/v1`-route scope enforcement; RS256/JWKS + dynamic client registration
 
 ### Initiative B — Observability & Evals  ✅ COMPLETE & VERIFIED
 - ~~Emit **OpenTelemetry GenAI** spans (agent/LLM-chat/tool) from `app/telemetry/otel.py`,
@@ -101,10 +105,12 @@ Everything **struck through** below is done and verified.
   live API key — costs money).
 - Verified: **41 backend tests** (+7 templates), ruff clean, frontend build green, eval gate 6/6.
 
-### Initiative D — Differentiator Features  ⬜ NOT STARTED
-- [ ] Code-mode / progressive tool disclosure (tools-as-code API + tool search)
-- [ ] Reusable skills/persistence (agent saves successful code as named skills)
-- [ ] Dynamic integration synthesis with egress allowlist + human-approval gate
+### Initiative D — Differentiator Features  🔄 IN PROGRESS
+- ~~**Reusable skills + progressive tool disclosure** (D items 1–2): agent saves working code as
+  named skills (`save_skill`) and reloads on demand (`load_skill`); system prompt shows a compact
+  catalog (names+descriptions only). `SkillStore` (SQLite), `/v1/skills` REST, opt-in via
+  injection (`app/orchestrator/skills.py`, `app/api/skills.py`). 5 tests~~
+- [ ] Dynamic integration synthesis with egress allowlist + human-approval gate (egress proxy ready)
 - [ ] True MCP aggregation (connect upstream MCP servers, re-expose); finish Gemini provider; multi-LLM routing + streaming
 
 ### Initiative E — Cloud & Enterprise (open-core monetization)  ⬜ LATER
@@ -146,24 +152,24 @@ First, read these to load full context:
 - ROADMAP.md and SECURITY.md
 - the strategy plan at ~/.claude/plans/project-nexus-the-cuddly-popcorn.md
 
-Status: Milestones 1–5 (blueprint) complete, plus Strategy Initiatives A (security moat, first
-pass), B (observability & evals), and C (adoption & DX) complete. 41 backend tests pass; ruff
-clean; frontend builds on Next 16; offline eval gate 6/6; all 3 Docker images build. Locked
-direction: open-core, general engine + legal/finance flagship templates, security-first.
+Status: Milestones 1–5 complete; Initiatives A (security moat + OAuth 2.1 + egress proxy),
+B (observability & evals), C (adoption & DX) complete; D (differentiator) IN PROGRESS — reusable
+skills + progressive disclosure shipped (items 1–2). 58 backend tests pass; ruff clean; frontend
+builds; offline eval gate 6/6; all 3 Docker images build. The repo is now a local git repo with
+commits; publish to GitHub/registries is STAGED for github.com/Trust-Code-System/corenexia
+(packaging/registry/RUNBOOK.md) and awaiting an explicit "go" — nothing pushed yet.
 
-Suggested next — Initiative D — Differentiator features:
-  1) Code-mode / progressive tool disclosure (tools-as-code API + tool search; Anthropic's token win)
-  2) Reusable skills/persistence (agent saves successful code as named, reusable skills)
-  3) Dynamic integration synthesis behind the sandbox + egress allowlist + human-approval gate
-  4) True MCP aggregation (connect upstream MCP servers, re-expose); finish Gemini provider;
-     multi-LLM routing + streaming
+Continue Initiative D — remaining items:
+  3) Dynamic integration synthesis behind the sandbox + egress allowlist (already built) +
+     a human-approval gate for any new outbound domain
+  4) True MCP aggregation (connect upstream MCP servers, re-expose); finish the Gemini provider;
+     cost/latency-aware multi-LLM routing + streaming
 
-Alternatively — gated/outward-facing follow-ups from C (need explicit go-ahead): publish the
-MCP Registry + Smithery drafts in packaging/registry/ (set real owner/URL first), record a demo
-GIF, run the full `docker compose up` end-to-end (socket-mounted backend; costs a live API call).
-Or revisit A follow-ups: MCP OAuth 2.1, egress allowlist proxy.
+Gated/outward-facing (need explicit go-ahead): push public repo + publish MCP Registry + Smithery
+(follow packaging/registry/RUNBOOK.md; gh is authed as Lingz450), record a demo GIF, run the full
+`docker compose up` end-to-end (socket-mounted backend; costs a live API call).
 
-Rules: keep the existing 41 tests + frontend build green; run ruff. Do NOT make live LLM
+Rules: keep the existing 58 tests + frontend build green; run ruff. Do NOT make live LLM
 calls or any outward-facing/paid action (incl. publishing to registries) without my explicit
 approval (my ANTHROPIC_API_KEY is in backend/.env). Windows local uses hardened Docker;
 gVisor/microVM are Linux/CI/cloud. Verify each change with pytest before reporting.

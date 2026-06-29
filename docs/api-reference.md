@@ -67,11 +67,32 @@ Turn a template into a run by POSTing its `query` (+ optional `example_context`)
 - `PUT /admin/keys/{id}/spend-cap` `{ "spend_cap_usd": 25.0 | null }` → set/clear the USD cap.
   Once a key's `cost_usd` reaches its cap, new orchestration requests get `402`.
 
+## Skills (reusable toolbox)
+
+The agent saves working scripts as named skills (via the `save_skill`/`load_skill` tools) and
+reloads them later. Browse/curate them here:
+
+- `GET /v1/skills?q=…` — list skill summaries (name/description/tags/use_count; no code). Public.
+- `GET /v1/skills/{name}` — one skill, including its code. Public.
+- `POST /v1/skills` `{name, description, code, tags}` → `201` create/update (API key when auth on).
+- `DELETE /v1/skills/{name}` → `204` (API key when auth on).
+
+## OAuth 2.1 (for MCP clients)
+
+- `POST /oauth/token` — `client_credentials` grant: send `grant_type=client_credentials` plus the
+  API key as `client_secret` (form field or HTTP Basic). Returns a short-lived scoped JWT
+  (`access_token`, `expires_in`, `scope`). Scopes: `orchestrate:run`, `orchestrate:read`.
+- `GET /.well-known/oauth-authorization-server` — RFC 8414 metadata.
+- `GET /.well-known/oauth-protected-resource` — RFC 9728 metadata.
+
+Present the JWT as `Authorization: Bearer <token>` anywhere an API key is accepted; tokens are
+validated for signature, `iss`, `aud`, `exp`, and scope. Static API keys keep working.
+
 ## MCP
 
 - `POST /mcp` — streamable-HTTP MCP server exposing the `orchestrate` tool. Point any MCP client
-  (Claude Desktop, MCP Inspector) at `http://localhost:8000/mcp`. Closed with the same Bearer API
-  keys when `AUTH_ENABLED=true`.
+  (Claude Desktop, MCP Inspector) at `http://localhost:8000/mcp`. When `AUTH_ENABLED=true` it
+  accepts a Bearer API key or a scoped token carrying `orchestrate:run`.
 
 ## Health
 
